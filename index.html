@@ -12,7 +12,6 @@
   <link rel="apple-touch-icon" href="icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
-
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -35,7 +34,7 @@
     .stat-pill strong { color: var(--accent); }
     .header-btn { background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--text2); padding: 5px 9px; cursor: pointer; font-size: 0.82rem; line-height: 1; transition: all .15s; white-space: nowrap; }
     .header-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .sync-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+    .sync-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: middle; }
     .sync-ok { background: var(--green); }
     .sync-busy { background: var(--accent); animation: pulse .8s infinite; }
     .sync-err { background: var(--red); }
@@ -174,36 +173,68 @@
   <div id="root"></div>
   <div class="toast" id="toast"></div>
 
-  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // ── Firebase config ────────────────────────────────────────────────────
     const firebaseConfig = {
       apiKey: "AIzaSyA8zYBGcB_EhqVJ3fg9hHdcrql0tx4C_xU",
       authDomain: "toolvault-345cc.firebaseapp.com",
       projectId: "toolvault-345cc",
       storageBucket: "toolvault-345cc.firebasestorage.app",
       messagingSenderId: "1030643746886",
-      appId: "1:1030643746886:web:e924d18a1f177f3bdc6247",
-      measurementId: "G-N9JG7XV47G"
+      appId: "1:1030643746886:web:e924d18a1f177f3bdc6247"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const toolsCol = collection(db, "tools");
 
-    // ── Config ─────────────────────────────────────────────────────────────
     const PASSWORD = "tools2024";
     const CATEGORIES = ["Power Tools","Hand Tools","Measuring & Layout","Cutting Tools","Fastening","Plumbing","Electrical","Automotive","Garden & Outdoor","Safety Equipment","Other"];
     const CONDITIONS = ["New","Excellent","Good","Fair","Needs Repair"];
     const STATUSES = ["Available","In Use","Loaned Out","Needs Repair","Retired"];
 
-    // ── Helpers ────────────────────────────────────────────────────────────
     function $(id) { return document.getElementById(id); }
     function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html) e.innerHTML = html; return e; }
-    function toBase64(file) { return new Promise((res,rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); }); }
+
+    // ── Compress image to stay under Firestore 1MB doc limit ───────────────
+    function compressImage(file, maxWidth=800, quality=0.7) {
+      return new Promise((res) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            let w = img.width, h = img.height;
+            if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+            canvas.width = w; canvas.height = h;
+            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+            res(canvas.toDataURL("image/jpeg", quality));
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function toBase64(file) {
+      return new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+    }
+
+    // Strip PDF data before saving to Firestore (too large) — store name only
+    // PDF stays in localStorage keyed by tool ID
+    function savePdfLocally(toolId, pdfData) {
+      if (pdfData) { try { localStorage.setItem(`tv_pdf_${toolId}`, pdfData); } catch {} }
+    }
+    function loadPdfLocally(toolId) {
+      try { return localStorage.getItem(`tv_pdf_${toolId}`); } catch { return null; }
+    }
 
     let toastTimer;
     function toast(msg, duration=2500) {
@@ -211,18 +242,15 @@
       clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), duration);
     }
 
-    // ── State ──────────────────────────────────────────────────────────────
     let tools = [];
     let search = "", filterCat = "All", filterStatus = "All", viewMode = "grid";
-    let syncStatus = "busy"; // busy | ok | err
+    let syncStatus = "busy";
 
-    // ── Auth ───────────────────────────────────────────────────────────────
     function isUnlocked() { return sessionStorage.getItem("tv_auth") === "1"; }
     function unlock() { sessionStorage.setItem("tv_auth","1"); startApp(); }
 
     function renderLock() {
-      const root = $("root");
-      root.innerHTML = `
+      $("root").innerHTML = `
         <div class="lock-screen">
           <div class="lock-box">
             <div class="lock-logo">Tool<span>Vault</span></div>
@@ -241,36 +269,41 @@
       setTimeout(() => $("pw-input").focus(), 100);
     }
 
-    // ── Firebase real-time listener ────────────────────────────────────────
     function startApp() {
-      // Show loading screen first
       $("root").innerHTML = `<div class="loading-screen"><span class="big-spin">☁️</span><p>Loading your inventory…</p></div>`;
-
-      // Listen for real-time updates from Firestore
       onSnapshot(toolsCol, (snapshot) => {
-        tools = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        tools = snapshot.docs.map(d => {
+          const data = { id: d.id, ...d.data() };
+          // Reattach PDF from local storage if available
+          if (data.manualPdfName && !data.manualPdf) {
+            data.manualPdf = loadPdfLocally(data.id);
+          }
+          return data;
+        });
         tools.sort((a,b) => (a.name||"").localeCompare(b.name||""));
         syncStatus = "ok";
         renderApp();
-      }, (err) => {
-        console.error(err);
+      }, () => {
         syncStatus = "err";
         renderApp();
         toast("⚠️ Sync error — check your connection");
       });
     }
 
-    // ── Save / Delete to Firestore ─────────────────────────────────────────
     async function saveTool(tool) {
       syncStatus = "busy";
       try {
-        const { id, ...data } = tool;
+        const { id, manualPdf, _isNew, ...data } = tool;
+        // Save PDF locally on this device only (too large for Firestore)
+        if (manualPdf) savePdfLocally(id, manualPdf);
+        // Save everything else to Firestore (no PDF binary)
         await setDoc(doc(db, "tools", id), data);
         syncStatus = "ok";
-        toast(tool._isNew ? "✅ Tool added!" : "✅ Tool updated!");
+        toast(_isNew ? "✅ Tool added!" : "✅ Tool updated!");
       } catch(e) {
         syncStatus = "err";
-        toast("❌ Save failed — check connection");
+        console.error("Save error:", e);
+        toast("❌ Save failed: " + (e.message || "unknown error"));
       }
     }
 
@@ -279,6 +312,7 @@
       syncStatus = "busy";
       try {
         await deleteDoc(doc(db, "tools", id));
+        localStorage.removeItem(`tv_pdf_${id}`);
         syncStatus = "ok";
         toast("🗑️ Tool deleted");
       } catch {
@@ -287,7 +321,6 @@
       }
     }
 
-    // ── Export / Import ────────────────────────────────────────────────────
     function exportData() {
       const json = JSON.stringify(tools, null, 2);
       const blob = new Blob([json], { type: "application/json" });
@@ -308,7 +341,8 @@
           if (!Array.isArray(imported)) throw new Error();
           if (!confirm(`Import ${imported.length} tools? Existing tools with the same ID will be overwritten.`)) return;
           for (const tool of imported) {
-            const { id, ...data } = tool;
+            const { id, manualPdf, ...data } = tool;
+            if (manualPdf) savePdfLocally(id, manualPdf);
             await setDoc(doc(db, "tools", id), data);
           }
           toast(`✅ Imported ${imported.length} tools!`);
@@ -317,7 +351,6 @@
       input.click();
     }
 
-    // ── Filtered list ──────────────────────────────────────────────────────
     function filtered() {
       const q = search.toLowerCase();
       return tools.filter(t => {
@@ -328,7 +361,6 @@
       });
     }
 
-    // ── Modal ──────────────────────────────────────────────────────────────
     function openModal(title, bodyHTML) {
       closeModal();
       const overlay = el("div","modal-overlay");
@@ -341,7 +373,6 @@
     function closeModal() { const m = $("modal-overlay"); if (m) m.remove(); }
     document.addEventListener("keydown", e => { if (e.key==="Escape") closeModal(); });
 
-    // ── Tool Form ──────────────────────────────────────────────────────────
     function openForm(tool) {
       const t = tool || {};
       const catOpts = CATEGORIES.map(c => `<option${c===(t.category||"Hand Tools")?" selected":""}>${c}</option>`).join("");
@@ -352,14 +383,14 @@
         <div class="tool-form">
           <div class="form-photo-row">
             <div class="form-photo-box" id="photo-box">
-              ${t.photo ? `<img src="${t.photo}" id="photo-preview" />` : `<div class="photo-placeholder"><div class="ph-icon">📷</div><small>Tap to add photo</small></div>`}
+              ${t.photo ? `<img src="${t.photo}" />` : `<div class="photo-placeholder"><div class="ph-icon">📷</div><small>Tap to add photo</small></div>`}
             </div>
             <input type="file" accept="image/*" id="photo-input" style="display:none" />
             <div class="form-col-main">
-              <div class="form-row"><label>Tool Name *</label><input id="f-name" value="${t.name||""}" placeholder="e.g. Circular Saw" /></div>
+              <div class="form-row"><label>Tool Name *</label><input id="f-name" value="${(t.name||"").replace(/"/g,'&quot;')}" placeholder="e.g. Circular Saw" /></div>
               <div class="form-row2">
-                <div class="form-row"><label>Brand</label><input id="f-brand" value="${t.brand||""}" placeholder="e.g. DeWalt" /></div>
-                <div class="form-row"><label>Model</label><input id="f-model" value="${t.model||""}" placeholder="e.g. DWE575" /></div>
+                <div class="form-row"><label>Brand</label><input id="f-brand" value="${(t.brand||"").replace(/"/g,'&quot;')}" placeholder="e.g. DeWalt" /></div>
+                <div class="form-row"><label>Model</label><input id="f-model" value="${(t.model||"").replace(/"/g,'&quot;')}" placeholder="e.g. DWE575" /></div>
               </div>
             </div>
           </div>
@@ -373,9 +404,9 @@
           </div>
           <div class="form-row2">
             <div class="form-row"><label>Price Paid ($)</label><input type="number" id="f-price" value="${t.pricePaid||""}" placeholder="0.00" min="0" step="0.01" /></div>
-            <div class="form-row"><label>Storage Location</label><input id="f-loc" value="${t.location||""}" placeholder="e.g. Garage Shelf 2" /></div>
+            <div class="form-row"><label>Storage Location</label><input id="f-loc" value="${(t.location||"").replace(/"/g,'&quot;')}" placeholder="e.g. Garage Shelf 2" /></div>
           </div>
-          <div class="form-row"><label>Tags (comma-separated)</label><input id="f-tags" value="${t.tags||""}" placeholder="e.g. cutting, woodwork" /></div>
+          <div class="form-row"><label>Tags (comma-separated)</label><input id="f-tags" value="${(t.tags||"").replace(/"/g,'&quot;')}" placeholder="e.g. cutting, woodwork" /></div>
           <div class="form-row"><label>Notes</label><textarea id="f-notes" rows="3" placeholder="Serial number, purchase location, tips…">${t.notes||""}</textarea></div>
           <div class="form-row">
             <label>Owner's Manual (PDF)</label>
@@ -395,7 +426,7 @@
       $("photo-box").onclick = () => $("photo-input").click();
       $("photo-input").onchange = async e => {
         const file = e.target.files[0]; if (!file) return;
-        photoData = await toBase64(file);
+        photoData = await compressImage(file);
         $("photo-box").innerHTML = `<img src="${photoData}" style="width:100%;height:100%;object-fit:cover" />`;
       };
       $("pdf-box").onclick = () => $("pdf-input").click();
@@ -413,22 +444,30 @@
         const saved = {
           id: (tool && tool.id) || Date.now().toString(),
           _isNew: !tool,
-          name, brand: $("f-brand").value.trim(), model: $("f-model").value.trim(),
-          category: $("f-cat").value, condition: $("f-cond").value,
-          status: $("f-status").value, yearPurchased: $("f-year").value,
-          pricePaid: $("f-price").value, location: $("f-loc").value.trim(),
-          tags: $("f-tags").value.trim(), notes: $("f-notes").value.trim(),
-          photo: photoData, manualPdf: pdfData, manualPdfName: pdfName
+          name,
+          brand: $("f-brand").value.trim(),
+          model: $("f-model").value.trim(),
+          category: $("f-cat").value,
+          condition: $("f-cond").value,
+          status: $("f-status").value,
+          yearPurchased: $("f-year").value,
+          pricePaid: $("f-price").value,
+          location: $("f-loc").value.trim(),
+          tags: $("f-tags").value.trim(),
+          notes: $("f-notes").value.trim(),
+          photo: photoData,
+          manualPdf: pdfData,
+          manualPdfName: pdfName
         };
         closeModal();
         await saveTool(saved);
       };
     }
 
-    // ── Tool Detail ────────────────────────────────────────────────────────
     function openDetail(tool) {
       const sc = `status-${tool.status.replace(/\s/g,"-").toLowerCase()}`;
       const tags = tool.tags ? tool.tags.split(",").map(t=>t.trim()).filter(Boolean).map(t=>`<span class="tag">${t}</span>`).join("") : "";
+      const pdf = tool.manualPdf || loadPdfLocally(tool.id);
       openModal("Tool Details", `
         <div class="tool-detail">
           ${tool.photo ? `<img src="${tool.photo}" class="detail-photo" />` : ""}
@@ -448,7 +487,7 @@
           </div>
           ${tags?`<div class="detail-tags">${tags}</div>`:""}
           ${tool.notes?`<div class="detail-notes"><strong>Notes:</strong> ${tool.notes}</div>`:""}
-          ${tool.manualPdf?`<a class="pdf-link" href="${tool.manualPdf}" download="${tool.manualPdfName||'manual.pdf'}">📄 Download Owner's Manual</a>`:""}
+          ${pdf?`<a class="pdf-link" href="${pdf}" download="${tool.manualPdfName||'manual.pdf'}">📄 Download Owner's Manual</a>`:""}
           <div class="form-actions">
             <button class="btn-secondary" id="detail-close">Close</button>
             <button class="btn-primary" id="detail-edit">Edit Tool</button>
@@ -458,13 +497,11 @@
       $("detail-edit").onclick = () => { closeModal(); openForm(tool); };
     }
 
-    // ── Render App ─────────────────────────────────────────────────────────
     function renderApp() {
       const root = $("root");
       root.innerHTML = "";
       const totalValue = tools.reduce((s,t) => s+(parseFloat(t.pricePaid)||0), 0);
       const list = filtered();
-
       const syncIcon = syncStatus==="ok" ? `<span class="sync-dot sync-ok"></span>Synced` :
                        syncStatus==="busy" ? `<span class="sync-dot sync-busy"></span>Syncing…` :
                        `<span class="sync-dot sync-err"></span>Offline`;
@@ -548,7 +585,6 @@
       $("stat-filter").onchange = e => { filterStatus=e.target.value; renderApp(); };
     }
 
-    // ── Boot ───────────────────────────────────────────────────────────────
     if (isUnlocked()) { startApp(); } else { renderLock(); }
   </script>
 </body>
