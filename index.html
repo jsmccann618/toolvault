@@ -141,14 +141,27 @@
     .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 20px; font-size: 0.9rem; color: var(--text); box-shadow: 0 8px 24px rgba(0,0,0,.4); z-index: 9999; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
     .toast.show { opacity: 1; }
 
-    .lock-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 20px; padding: 24px; }
-    .lock-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px; width: 100%; max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
-    .lock-logo { font-family: var(--font-head); font-size: 2.2rem; font-weight: 800; }
-    .lock-logo span { color: var(--accent); }
+    .lock-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 0; padding: 0; background: #0a0b0f; }
+    .lock-vault-img { width: 100%; max-width: 420px; display: block; }
+    .lock-box { background: rgba(15,17,23,0.92); border: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius); padding: 28px 36px 36px; width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
     .lock-sub { color: var(--text2); font-size: 0.9rem; }
     .lock-input { width: 100%; padding: 11px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 1rem; font-family: var(--font-body); outline: none; text-align: center; letter-spacing: 2px; }
     .lock-input:focus { border-color: var(--accent); }
     .lock-error { color: var(--red); font-size: 0.85rem; }
+
+    /* Chrome metallic text matching the vault image */
+    .chrome-text {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 800;
+      font-size: 1.9rem;
+      letter-spacing: 3px;
+      background: linear-gradient(180deg, #ffffff 0%, #c8cdd6 25%, #8a9099 50%, #c8cdd6 75%, #ffffff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.8));
+    }
 
     .loading-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; gap: 14px; color: var(--text2); }
     .loading-screen .big-spin { font-size: 2.5rem; animation: spin .8s linear infinite; }
@@ -252,8 +265,8 @@
     function renderLock() {
       $("root").innerHTML = `
         <div class="lock-screen">
+          <img class="lock-vault-img" src="vault-logo.jpg" alt="Tool Vault" />
           <div class="lock-box">
-            <div class="lock-logo">Tool<span>Vault</span></div>
             <div class="lock-sub">🔒 Enter your password to continue</div>
             <input class="lock-input" id="pw-input" type="password" placeholder="Password" autocomplete="current-password" />
             <button class="btn-primary" id="pw-btn" style="width:100%">Unlock</button>
@@ -558,7 +571,7 @@
 
       const header = el("header","app-header");
       header.innerHTML = `
-        <div class="logo">Tool<span>Vault</span></div>
+        <div class="chrome-text">TOOL VAULT</div>
         <div class="header-right">
           <div class="stat-pill"><strong>${tools.length}</strong> tools</div>
           ${totalValue>0?`<div class="stat-pill">Total: <strong>$${totalValue.toFixed(2)}</strong></div>`:""}
