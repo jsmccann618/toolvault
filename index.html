@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>ToolVault</title>
+
+  <!-- PWA / Home Screen support -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ToolVault" />
+  <meta name="theme-color" content="#f5a623" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f1117; --surface: #1a1d27; --surface2: #222535;
+      --border: #2e3347; --accent: #f5a623;
+      --text: #e8eaf0; --text2: #8b92a8;
+      --green: #2ecc71; --red: #e74c3c; --blue: #3498db;
+      --radius: 12px;
+      --font-head: 'Barlow Condensed', sans-serif;
+      --font-body: 'Barlow', sans-serif;
+    }
+    html, body { height: 100%; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-body); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+    /* HEADER */
+    .app-header {
+      background: var(--surface); border-bottom: 2px solid var(--accent);
+      padding: 0 20px; display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100; height: 60px; gap: 10px;
+    }
+    .logo { font-family: var(--font-head); font-size: 1.8rem; font-weight: 800; letter-spacing: 1px; white-space: nowrap; }
+    .logo span { color: var(--accent); }
+    .header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .stat-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 12px; font-size: 0.78rem; color: var(--text2); white-space: nowrap; }
+    .stat-pill strong { color: var(--accent); }
+    .header-btn { background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--text2); padding: 5px 9px; cursor: pointer; font-size: 0.82rem; line-height: 1; transition: all .15s; white-space: nowrap; }
+    .header-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* TOOLBAR */
+    .toolbar {
+      padding: 12px 20px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 60px; z-index: 99;
+    }
+    .search-wrap { position: relative; flex: 1; min-width: 180px; }
+    .search-wrap input { width: 100%; padding: 9px 12px 9px 36px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font-body); font-size: 0.92rem; outline: none; transition: border-color .2s; }
+    .search-wrap input:focus { border-color: var(--accent); }
+    .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 0.95rem; pointer-events: none; }
+    select { padding: 9px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font-body); font-size: 0.87rem; outline: none; cursor: pointer; }
+    select:focus { border-color: var(--accent); }
+    .btn-add { padding: 9px 18px; background: var(--accent); color: #000; border: none; border-radius: 8px; font-family: var(--font-head); font-weight: 700; font-size: 1rem; letter-spacing: .5px; cursor: pointer; white-space: nowrap; transition: background .15s, transform .1s; }
+    .btn-add:hover { background: #f7b84a; transform: translateY(-1px); }
+    .view-toggle { display: flex; gap: 4px; }
+    .view-btn { padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 1rem; line-height: 1; color: var(--text2); transition: all .15s; }
+    .view-btn.active { background: var(--surface2); border-color: var(--accent); color: var(--accent); }
+
+    /* MAIN */
+    .app-main { padding: 20px; max-width: 1400px; margin: 0 auto; }
+    .results-bar { margin-bottom: 14px; font-size: 0.84rem; color: var(--text2); }
+    .results-bar strong { color: var(--text); }
+
+    /* GRID / LIST */
+    .tools-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 14px; }
+    .tools-list { display: flex; flex-direction: column; gap: 10px; }
+
+    /* CARD */
+    .tool-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; cursor: pointer; transition: transform .15s, border-color .15s, box-shadow .15s; }
+    .tool-card:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 6px 24px rgba(245,166,35,.12); }
+    .card-photo { position: relative; height: 155px; background: var(--surface2); overflow: hidden; }
+    .card-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .no-photo { display: flex; align-items: center; justify-content: center; height: 100%; }
+    .no-photo span { font-size: 3rem; opacity: .3; }
+    .status-badge { position: absolute; top: 8px; right: 8px; padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; font-family: var(--font-head); letter-spacing: .5px; }
+    .status-available { background: rgba(46,204,113,.15); color: var(--green); border: 1px solid rgba(46,204,113,.3); }
+    .status-in-use { background: rgba(52,152,219,.15); color: var(--blue); border: 1px solid rgba(52,152,219,.3); }
+    .status-loaned-out { background: rgba(245,166,35,.15); color: var(--accent); border: 1px solid rgba(245,166,35,.3); }
+    .status-needs-repair { background: rgba(231,76,60,.15); color: var(--red); border: 1px solid rgba(231,76,60,.3); }
+    .status-retired { background: rgba(139,146,168,.15); color: var(--text2); border: 1px solid var(--border); }
+    .card-body { padding: 11px 13px 7px; }
+    .card-cat { font-size: 0.7rem; color: var(--accent); font-family: var(--font-head); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 3px; }
+    .card-name { font-family: var(--font-head); font-size: 1.18rem; font-weight: 700; margin-bottom: 2px; }
+    .card-brand { font-size: 0.8rem; color: var(--text2); margin-bottom: 7px; }
+    .card-meta { display: flex; gap: 5px; flex-wrap: wrap; }
+    .meta-chip { font-size: 0.72rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; color: var(--text2); }
+    .card-actions { display: flex; justify-content: flex-end; gap: 6px; padding: 7px 10px; border-top: 1px solid var(--border); }
+    .btn-icon { padding: 5px 8px; background: transparent; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: all .15s; }
+    .btn-icon:hover { background: var(--surface2); border-color: var(--text2); }
+    .btn-danger:hover { border-color: var(--red); background: rgba(231,76,60,.1); }
+    .tools-list .tool-card { display: flex; flex-direction: row; }
+    .tools-list .card-photo { width: 95px; height: 78px; flex-shrink: 0; }
+    .tools-list .card-body { flex: 1; padding: 9px 12px; }
+    .tools-list .card-actions { flex-direction: column; padding: 9px; border-top: none; border-left: 1px solid var(--border); }
+
+    /* EMPTY */
+    .empty-state { text-align: center; padding: 80px 20px; color: var(--text2); }
+    .empty-state .empty-icon { font-size: 4rem; margin-bottom: 14px; opacity: .4; }
+    .empty-state h3 { font-family: var(--font-head); font-size: 1.5rem; color: var(--text); margin-bottom: 6px; }
+
+    /* MODAL */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; backdrop-filter: blur(4px); }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 640px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .modal-header h2 { font-family: var(--font-head); font-size: 1.5rem; font-weight: 700; }
+    .modal-close { background: transparent; border: none; color: var(--text2); font-size: 1.3rem; cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1; }
+    .modal-close:hover { color: var(--text); background: var(--surface2); }
+    .modal-body { overflow-y: auto; padding: 20px; flex: 1; }
+
+    /* FORM */
+    .tool-form { display: flex; flex-direction: column; gap: 13px; }
+    .form-photo-row { display: flex; gap: 13px; }
+    .form-photo-box { width: 108px; height: 108px; flex-shrink: 0; background: var(--surface2); border: 2px dashed var(--border); border-radius: 10px; cursor: pointer; overflow: hidden; transition: border-color .15s; display: flex; align-items: center; justify-content: center; }
+    .form-photo-box:hover { border-color: var(--accent); }
+    .form-photo-box img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; padding: 8px; }
+    .photo-placeholder .ph-icon { font-size: 1.8rem; opacity: .4; }
+    .photo-placeholder small { font-size: 0.68rem; color: var(--text2); }
+    .form-col-main { flex: 1; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+    .form-row { display: flex; flex-direction: column; gap: 4px; }
+    .form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+    .form-row label { font-size: 0.77rem; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; }
+    .form-row input, .form-row select, .form-row textarea { padding: 9px 11px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font-body); font-size: 0.92rem; outline: none; transition: border-color .2s; resize: vertical; width: 100%; }
+    .form-row input:focus, .form-row select:focus, .form-row textarea:focus { border-color: var(--accent); }
+    .pdf-upload { padding: 9px 13px; background: var(--bg); border: 1px dashed var(--border); border-radius: 8px; cursor: pointer; font-size: 0.87rem; color: var(--text2); transition: border-color .15s; }
+    .pdf-upload:hover { border-color: var(--accent); color: var(--text); }
+    .form-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 4px; }
+    .btn-primary { padding: 10px 22px; background: var(--accent); color: #000; border: none; border-radius: 8px; font-family: var(--font-head); font-weight: 700; font-size: 1rem; cursor: pointer; transition: background .15s; }
+    .btn-primary:hover { background: #f7b84a; }
+    .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-secondary { padding: 10px 22px; background: transparent; color: var(--text2); border: 1px solid var(--border); border-radius: 8px; font-family: var(--font-body); font-size: 0.92rem; cursor: pointer; transition: all .15s; }
+    .btn-secondary:hover { border-color: var(--text2); color: var(--text); }
+
+    /* DETAIL */
+    .tool-detail { display: flex; flex-direction: column; gap: 14px; }
+    .detail-photo { width: 100%; max-height: 230px; object-fit: cover; border-radius: 10px; }
+    .detail-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .detail-cat { font-size: 0.72rem; color: var(--accent); font-family: var(--font-head); font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+    .detail-name { font-family: var(--font-head); font-size: 1.65rem; font-weight: 800; }
+    .detail-brand { color: var(--text2); font-size: 0.87rem; margin-top: 2px; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .detail-item { background: var(--surface2); border-radius: 8px; padding: 9px 13px; }
+    .detail-item .di-label { display: block; font-size: 0.72rem; color: var(--text2); margin-bottom: 2px; }
+    .detail-item strong { font-size: 0.96rem; }
+    .detail-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag { padding: 3px 10px; background: rgba(245,166,35,.1); border: 1px solid rgba(245,166,35,.25); border-radius: 20px; font-size: 0.75rem; color: var(--accent); }
+    .detail-notes { background: var(--surface2); border-radius: 8px; padding: 11px 13px; font-size: 0.87rem; color: var(--text2); line-height: 1.5; }
+    .pdf-link { display: inline-flex; align-items: center; gap: 8px; padding: 9px 15px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); text-decoration: none; font-size: 0.87rem; transition: border-color .15s; }
+    .pdf-link:hover { border-color: var(--accent); }
+
+    /* TOAST */
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 20px; font-size: 0.9rem; color: var(--text); box-shadow: 0 8px 24px rgba(0,0,0,.4); z-index: 9999; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+    .toast.show { opacity: 1; }
+
+    /* PASSWORD */
+    .lock-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 20px; padding: 24px; }
+    .lock-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px; width: 100%; max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+    .lock-logo { font-family: var(--font-head); font-size: 2.2rem; font-weight: 800; }
+    .lock-logo span { color: var(--accent); }
+    .lock-sub { color: var(--text2); font-size: 0.9rem; }
+    .lock-input { width: 100%; padding: 11px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 1rem; font-family: var(--font-body); outline: none; text-align: center; letter-spacing: 2px; }
+    .lock-input:focus { border-color: var(--accent); }
+    .lock-error { color: var(--red); font-size: 0.85rem; }
+
+    @media (max-width: 600px) {
+      .app-header { height: auto; padding: 8px 14px; flex-wrap: wrap; }
+      .toolbar { padding: 10px 14px; }
+      .tools-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .form-photo-row { flex-direction: column; }
+      .form-photo-box { width: 100%; height: 130px; }
+      .form-row2 { grid-template-columns: 1fr; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .logo { font-size: 1.4rem; }
+      .tools-list .tool-card { flex-direction: column; }
+      .tools-list .card-photo { width: 100%; height: 130px; }
+      .tools-list .card-actions { border-left: none; border-top: 1px solid var(--border); flex-direction: row; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ── Config ──────────────────────────────────────────────────────────────
+    const PASSWORD = "tools2024";   // ← Change this to your own password
+    const STORAGE_KEY = "toolvault_v1";
+
+    const CATEGORIES = ["Power Tools","Hand Tools","Measuring & Layout","Cutting Tools","Fastening","Plumbing","Electrical","Automotive","Garden & Outdoor","Safety Equipment","Other"];
+    const CONDITIONS = ["New","Excellent","Good","Fair","Needs Repair"];
+    const STATUSES = ["Available","In Use","Loaned Out","Needs Repair","Retired"];
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    function $(id) { return document.getElementById(id); }
+    function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html) e.innerHTML = html; return e; }
+    function toBase64(file) { return new Promise((res,rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); }); }
+
+    let toastTimer;
+    function toast(msg, duration = 2500) {
+      const t = $("toast"); t.textContent = msg; t.classList.add("show");
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), duration);
+    }
+
+    // ── Storage ─────────────────────────────────────────────────────────────
+    function loadTools() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; } }
+    function saveTools(tools) { localStorage.setItem(STORAGE_KEY, JSON.stringify(tools)); }
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let tools = loadTools();
+    let search = "", filterCat = "All", filterStatus = "All", viewMode = "grid";
+    let editingTool = null, viewingTool = null;
+
+    // ── Auth ─────────────────────────────────────────────────────────────────
+    function isUnlocked() { return sessionStorage.getItem("tv_auth") === "1"; }
+    function unlock() { sessionStorage.setItem("tv_auth", "1"); renderApp(); }
+
+    function renderLock() {
+      const root = $("root");
+      root.innerHTML = "";
+      const screen = el("div", "lock-screen");
+      screen.innerHTML = `
+        <div class="lock-box">
+          <div class="lock-logo">Tool<span>Vault</span></div>
+          <div class="lock-sub">🔒 Enter your password to continue</div>
+          <input class="lock-input" id="pw-input" type="password" placeholder="Password" autocomplete="current-password" />
+          <button class="btn-primary" id="pw-btn" style="width:100%">Unlock</button>
+          <div class="lock-error" id="pw-err" style="display:none">Incorrect password</div>
+        </div>
+      `;
+      root.appendChild(screen);
+      function tryLogin() {
+        if ($("pw-input").value === PASSWORD) { unlock(); }
+        else { $("pw-err").style.display = ""; $("pw-input").value = ""; $("pw-input").focus(); }
+      }
+      $("pw-btn").onclick = tryLogin;
+      $("pw-input").onkeydown = e => { if (e.key === "Enter") tryLogin(); };
+      setTimeout(() => $("pw-input").focus(), 100);
+    }
+
+    // ── Export / Import ──────────────────────────────────────────────────────
+    function exportData() {
+      const json = JSON.stringify(tools, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `toolvault-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      toast("✅ Backup downloaded!");
+    }
+
+    function importData() {
+      const input = document.createElement("input");
+      input.type = "file"; input.accept = ".json";
+      input.onchange = async e => {
+        try {
+          const text = await e.target.files[0].text();
+          const imported = JSON.parse(text);
+          if (!Array.isArray(imported)) throw new Error();
+          if (!confirm(`Import ${imported.length} tools? This will REPLACE your current inventory.`)) return;
+          tools = imported;
+          saveTools(tools);
+          renderApp();
+          toast(`✅ Imported ${imported.length} tools!`);
+        } catch { toast("❌ Invalid backup file"); }
+      };
+      input.click();
+    }
+
+    // ── Filtered list ────────────────────────────────────────────────────────
+    function filtered() {
+      const q = search.toLowerCase();
+      return tools.filter(t => {
+        const matchSearch = !q || [t.name,t.brand,t.model,t.location,t.tags,t.notes,t.category].some(f => f && f.toLowerCase().includes(q));
+        const matchCat = filterCat === "All" || t.category === filterCat;
+        const matchStatus = filterStatus === "All" || t.status === filterStatus;
+        return matchSearch && matchCat && matchStatus;
+      });
+    }
+
+    // ── Modal helpers ────────────────────────────────────────────────────────
+    function openModal(title, bodyHTML) {
+      closeModal();
+      const overlay = el("div", "modal-overlay");
+      overlay.id = "modal-overlay";
+      overlay.innerHTML = `
+        <div class="modal">
+          <div class="modal-header">
+            <h2>${title}</h2>
+            <button class="modal-close" id="modal-close-btn">✕</button>
+          </div>
+          <div class="modal-body" id="modal-body">${bodyHTML}</div>
+        </div>
+      `;
+      overlay.onclick = e => { if (e.target === overlay) closeModal(); };
+      document.body.appendChild(overlay);
+      $("modal-close-btn").onclick = closeModal;
+    }
+    function closeModal() {
+      const m = $("modal-overlay");
+      if (m) m.remove();
+    }
+    document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+    // ── Tool Form ────────────────────────────────────────────────────────────
+    function openForm(tool) {
+      editingTool = tool || null;
+      const t = tool || {};
+      const catOptions = CATEGORIES.map(c => `<option${c===( t.category||"Hand Tools")?" selected":""}>${c}</option>`).join("");
+      const condOptions = CONDITIONS.map(c => `<option${c===(t.condition||"Good")?" selected":""}>${c}</option>`).join("");
+      const statOptions = STATUSES.map(s => `<option${s===(t.status||"Available")?" selected":""}>${s}</option>`).join("");
+
+      openModal(tool ? "Edit Tool" : "Add New Tool", `
+        <div class="tool-form" id="tool-form">
+          <div class="form-photo-row">
+            <div class="form-photo-box" id="photo-box">
+              ${t.photo ? `<img src="${t.photo}" id="photo-preview" />` : `<div class="photo-placeholder"><div class="ph-icon">📷</div><small>Tap to add photo</small></div>`}
+            </div>
+            <input type="file" accept="image/*" id="photo-input" style="display:none" />
+            <div class="form-col-main">
+              <div class="form-row">
+                <label>Tool Name *</label>
+                <input id="f-name" value="${t.name||""}" placeholder="e.g. Circular Saw" />
+              </div>
+              <div class="form-row2">
+                <div class="form-row"><label>Brand</label><input id="f-brand" value="${t.brand||""}" placeholder="e.g. DeWalt" /></div>
+                <div class="form-row"><label>Model</label><input id="f-model" value="${t.model||""}" placeholder="e.g. DWE575" /></div>
+              </div>
+            </div>
+          </div>
+          <div class="form-row2">
+            <div class="form-row"><label>Category</label><select id="f-cat">${catOptions}</select></div>
+            <div class="form-row"><label>Condition</label><select id="f-cond">${condOptions}</select></div>
+          </div>
+          <div class="form-row2">
+            <div class="form-row"><label>Status</label><select id="f-status">${statOptions}</select></div>
+            <div class="form-row"><label>Year Purchased</label><input type="number" id="f-year" value="${t.yearPurchased||new Date().getFullYear()}" min="1990" max="2099" /></div>
+          </div>
+          <div class="form-row2">
+            <div class="form-row"><label>Price Paid ($)</label><input type="number" id="f-price" value="${t.pricePaid||""}" placeholder="0.00" min="0" step="0.01" /></div>
+            <div class="form-row"><label>Storage Location</label><input id="f-loc" value="${t.location||""}" placeholder="e.g. Garage Shelf 2" /></div>
+          </div>
+          <div class="form-row"><label>Tags (comma-separated)</label><input id="f-tags" value="${t.tags||""}" placeholder="e.g. cutting, woodwork" /></div>
+          <div class="form-row"><label>Notes</label><textarea id="f-notes" rows="3" placeholder="Serial number, purchase location, tips…">${t.notes||""}</textarea></div>
+          <div class="form-row">
+            <label>Owner's Manual (PDF)</label>
+            <div class="pdf-upload" id="pdf-box">${t.manualPdfName ? `📄 ${t.manualPdfName}` : "📎 Attach PDF manual"}</div>
+            <input type="file" accept="application/pdf" id="pdf-input" style="display:none" />
+          </div>
+          <div class="form-actions">
+            <button class="btn-secondary" id="form-cancel">Cancel</button>
+            <button class="btn-primary" id="form-save">${tool ? "Update Tool" : "Add Tool"}</button>
+          </div>
+        </div>
+      `);
+
+      // Photo upload
+      let photoData = t.photo || null;
+      let pdfData = t.manualPdf || null;
+      let pdfName = t.manualPdfName || null;
+
+      $("photo-box").onclick = () => $("photo-input").click();
+      $("photo-input").onchange = async e => {
+        const file = e.target.files[0]; if (!file) return;
+        photoData = await toBase64(file);
+        $("photo-box").innerHTML = `<img src="${photoData}" style="width:100%;height:100%;object-fit:cover" />`;
+      };
+      $("pdf-box").onclick = () => $("pdf-input").click();
+      $("pdf-input").onchange = async e => {
+        const file = e.target.files[0]; if (!file) return;
+        pdfData = await toBase64(file);
+        pdfName = file.name;
+        $("pdf-box").textContent = `📄 ${file.name}`;
+      };
+      $("form-cancel").onclick = closeModal;
+      $("form-save").onclick = () => {
+        const name = $("f-name").value.trim();
+        if (!name) { alert("Tool name is required."); return; }
+        const saved = {
+          id: (editingTool && editingTool.id) || Date.now().toString(),
+          name, brand: $("f-brand").value.trim(), model: $("f-model").value.trim(),
+          category: $("f-cat").value, condition: $("f-cond").value,
+          status: $("f-status").value, yearPurchased: $("f-year").value,
+          pricePaid: $("f-price").value, location: $("f-loc").value.trim(),
+          tags: $("f-tags").value.trim(), notes: $("f-notes").value.trim(),
+          photo: photoData, manualPdf: pdfData, manualPdfName: pdfName
+        };
+        if (editingTool) { tools = tools.map(t => t.id === saved.id ? saved : t); }
+        else { tools.push(saved); }
+        saveTools(tools);
+        closeModal();
+        renderApp();
+        toast(editingTool ? "✅ Tool updated!" : "✅ Tool added!");
+      };
+    }
+
+    // ── Tool Detail ──────────────────────────────────────────────────────────
+    function openDetail(tool) {
+      const statusClass = `status-${tool.status.replace(/\s/g,"-").toLowerCase()}`;
+      const tags = tool.tags ? tool.tags.split(",").map(t => t.trim()).filter(Boolean).map(t => `<span class="tag">${t}</span>`).join("") : "";
+      openModal("Tool Details", `
+        <div class="tool-detail">
+          ${tool.photo ? `<img src="${tool.photo}" class="detail-photo" />` : ""}
+          <div class="detail-header">
+            <div>
+              <div class="detail-cat">${tool.category}</div>
+              <div class="detail-name">${tool.name}</div>
+              ${tool.brand ? `<div class="detail-brand">${tool.brand}${tool.model ? ` — ${tool.model}` : ""}</div>` : ""}
+            </div>
+            <span class="status-badge ${statusClass}">${tool.status}</span>
+          </div>
+          <div class="detail-grid">
+            ${tool.location ? `<div class="detail-item"><span class="di-label">📍 Location</span><strong>${tool.location}</strong></div>` : ""}
+            ${tool.pricePaid ? `<div class="detail-item"><span class="di-label">💰 Paid</span><strong>$${parseFloat(tool.pricePaid).toFixed(2)}</strong></div>` : ""}
+            ${tool.yearPurchased ? `<div class="detail-item"><span class="di-label">🗓 Year</span><strong>${tool.yearPurchased}</strong></div>` : ""}
+            ${tool.condition ? `<div class="detail-item"><span class="di-label">⭐ Condition</span><strong>${tool.condition}</strong></div>` : ""}
+          </div>
+          ${tags ? `<div class="detail-tags">${tags}</div>` : ""}
+          ${tool.notes ? `<div class="detail-notes"><strong>Notes:</strong> ${tool.notes}</div>` : ""}
+          ${tool.manualPdf ? `<a class="pdf-link" href="${tool.manualPdf}" download="${tool.manualPdfName||'manual.pdf'}">📄 Download Owner's Manual</a>` : ""}
+          <div class="form-actions">
+            <button class="btn-secondary" id="detail-close">Close</button>
+            <button class="btn-primary" id="detail-edit">Edit Tool</button>
+          </div>
+        </div>
+      `);
+      $("detail-close").onclick = closeModal;
+      $("detail-edit").onclick = () => { closeModal(); openForm(tool); };
+    }
+
+    // ── Delete ───────────────────────────────────────────────────────────────
+    function deleteTool(id) {
+      if (!confirm("Delete this tool from your inventory?")) return;
+      tools = tools.filter(t => t.id !== id);
+      saveTools(tools);
+      renderApp();
+      toast("🗑️ Tool deleted");
+    }
+
+    // ── Render App ───────────────────────────────────────────────────────────
+    function renderApp() {
+      const root = $("root");
+      root.innerHTML = "";
+
+      const totalValue = tools.reduce((s, t) => s + (parseFloat(t.pricePaid) || 0), 0);
+      const list = filtered();
+
+      // Header
+      const header = el("header", "app-header");
+      header.innerHTML = `
+        <div class="logo">Tool<span>Vault</span></div>
+        <div class="header-right">
+          <div class="stat-pill"><strong>${tools.length}</strong> tools</div>
+          ${totalValue > 0 ? `<div class="stat-pill">Total: <strong>$${totalValue.toFixed(2)}</strong></div>` : ""}
+          <button class="header-btn" id="btn-export">⬇ Backup</button>
+          <button class="header-btn" id="btn-import">⬆ Import</button>
+        </div>
+      `;
+      root.appendChild(header);
+
+      // Toolbar
+      const catOptions = `<option value="All">All Categories</option>` + CATEGORIES.map(c => `<option${c===filterCat?" selected":""}>${c}</option>`).join("");
+      const statOptions = `<option value="All">All Statuses</option>` + STATUSES.map(s => `<option${s===filterStatus?" selected":""}>${s}</option>`).join("");
+      const toolbar = el("div", "toolbar");
+      toolbar.innerHTML = `
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input id="search-input" placeholder="Search tools, brands, locations…" value="${search}" />
+        </div>
+        <select id="cat-filter">${catOptions}</select>
+        <select id="stat-filter">${statOptions}</select>
+        <div class="view-toggle">
+          <button class="view-btn${viewMode==="grid"?" active":""}" id="btn-grid">⊞</button>
+          <button class="view-btn${viewMode==="list"?" active":""}" id="btn-list">☰</button>
+        </div>
+        <button class="btn-add" id="btn-add">+ Add Tool</button>
+      `;
+      root.appendChild(toolbar);
+
+      // Main
+      const main = el("div", "app-main");
+      if (tools.length > 0) {
+        const bar = el("div", "results-bar");
+        bar.innerHTML = `Showing <strong>${list.length}</strong> of <strong>${tools.length}</strong> tools`;
+        main.appendChild(bar);
+      }
+
+      if (list.length === 0) {
+        main.innerHTML += `
+          <div class="empty-state">
+            <div class="empty-icon">🔧</div>
+            ${tools.length === 0
+              ? `<h3>Your inventory is empty</h3><p>Tap <strong>+ Add Tool</strong> to start building your collection.</p>`
+              : `<h3>No tools match your search</h3><p>Try different keywords or clear your filters.</p>`}
+          </div>`;
+      } else {
+        const grid = el("div", viewMode === "grid" ? "tools-grid" : "tools-list");
+        list.forEach(tool => {
+          const statusClass = `status-${tool.status.replace(/\s/g,"-").toLowerCase()}`;
+          const card = el("div", "tool-card");
+          card.innerHTML = `
+            <div class="card-photo">
+              ${tool.photo ? `<img src="${tool.photo}" alt="${tool.name}" />` : `<div class="no-photo"><span>🔧</span></div>`}
+              <span class="status-badge ${statusClass}">${tool.status}</span>
+            </div>
+            <div class="card-body">
+              <div class="card-cat">${tool.category}</div>
+              <h3 class="card-name">${tool.name}</h3>
+              ${tool.brand ? `<p class="card-brand">${tool.brand}${tool.model ? ` · ${tool.model}` : ""}</p>` : ""}
+              <div class="card-meta">
+                ${tool.location ? `<span class="meta-chip">📍 ${tool.location}</span>` : ""}
+                ${tool.pricePaid ? `<span class="meta-chip">💰 $${parseFloat(tool.pricePaid).toFixed(2)}</span>` : ""}
+                ${tool.yearPurchased ? `<span class="meta-chip">🗓 ${tool.yearPurchased}</span>` : ""}
+              </div>
+            </div>
+            <div class="card-actions">
+              <button class="btn-icon btn-edit" title="Edit">✏️</button>
+              <button class="btn-icon btn-danger btn-del" title="Delete">🗑️</button>
+            </div>
+          `;
+          card.querySelector(".card-photo").onclick = () => openDetail(tool);
+          card.querySelector(".card-body").onclick = () => openDetail(tool);
+          card.querySelector(".btn-edit").onclick = e => { e.stopPropagation(); openForm(tool); };
+          card.querySelector(".btn-del").onclick = e => { e.stopPropagation(); deleteTool(tool.id); };
+          grid.appendChild(card);
+        });
+        main.appendChild(grid);
+      }
+      root.appendChild(main);
+
+      // Wire up events
+      $("btn-export").onclick = exportData;
+      $("btn-import").onclick = importData;
+      $("btn-add").onclick = () => openForm(null);
+      $("btn-grid").onclick = () => { viewMode = "grid"; renderApp(); };
+      $("btn-list").onclick = () => { viewMode = "list"; renderApp(); };
+      $("search-input").oninput = e => { search = e.target.value; renderApp(); };
+      $("search-input").focus();  // keep focus after re-render only if typing
+      $("cat-filter").onchange = e => { filterCat = e.target.value; renderApp(); };
+      $("stat-filter").onchange = e => { filterStatus = e.target.value; renderApp(); };
+    }
+
+    // ── Boot ─────────────────────────────────────────────────────────────────
+    if (isUnlocked()) { renderApp(); } else { renderLock(); }
+  </script>
+</body>
+</html>
