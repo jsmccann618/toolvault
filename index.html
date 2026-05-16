@@ -497,6 +497,56 @@
       $("detail-edit").onclick = () => { closeModal(); openForm(tool); };
     }
 
+    // Re-renders only the tool cards + results bar — leaves toolbar/header untouched
+    // This keeps the keyboard open on mobile when searching
+    function renderGrid() {
+      const main = $("app-main");
+      if (!main) { renderApp(); return; }
+      main.innerHTML = "";
+      const list = filtered();
+      const totalValue = tools.reduce((s,t) => s+(parseFloat(t.pricePaid)||0), 0);
+
+      if (tools.length > 0) {
+        const bar = el("div","results-bar");
+        bar.innerHTML = `Showing <strong>${list.length}</strong> of <strong>${tools.length}</strong> tools`;
+        main.appendChild(bar);
+      }
+      if (list.length === 0) {
+        main.innerHTML += `<div class="empty-state"><div class="empty-icon">🔧</div>${tools.length===0?`<h3>Your inventory is empty</h3><p>Tap <strong>+ Add Tool</strong> to start.</p>`:`<h3>No tools match your search</h3><p>Try different keywords or clear your filters.</p>`}</div>`;
+      } else {
+        const grid = el("div", viewMode==="grid"?"tools-grid":"tools-list");
+        list.forEach(tool => {
+          const sc = `status-${tool.status.replace(/\s/g,"-").toLowerCase()}`;
+          const card = el("div","tool-card");
+          card.innerHTML = `
+            <div class="card-photo">
+              ${tool.photo?`<img src="${tool.photo}" alt="${tool.name}" />`:`<div class="no-photo"><span>🔧</span></div>`}
+              <span class="status-badge ${sc}">${tool.status}</span>
+            </div>
+            <div class="card-body">
+              <div class="card-cat">${tool.category}</div>
+              <h3 class="card-name">${tool.name}</h3>
+              ${tool.brand?`<p class="card-brand">${tool.brand}${tool.model?` · ${tool.model}`:""}</p>`:""}
+              <div class="card-meta">
+                ${tool.location?`<span class="meta-chip">📍 ${tool.location}</span>`:""}
+                ${tool.pricePaid?`<span class="meta-chip">💰 $${parseFloat(tool.pricePaid).toFixed(2)}</span>`:""}
+                ${tool.yearPurchased?`<span class="meta-chip">🗓 ${tool.yearPurchased}</span>`:""}
+              </div>
+            </div>
+            <div class="card-actions">
+              <button class="btn-icon btn-edit" title="Edit">✏️</button>
+              <button class="btn-icon btn-danger btn-del" title="Delete">🗑️</button>
+            </div>`;
+          card.querySelector(".card-photo").onclick = () => openDetail(tool);
+          card.querySelector(".card-body").onclick = () => openDetail(tool);
+          card.querySelector(".btn-edit").onclick = e => { e.stopPropagation(); openForm(tool); };
+          card.querySelector(".btn-del").onclick = e => { e.stopPropagation(); deleteTool(tool.id); };
+          grid.appendChild(card);
+        });
+        main.appendChild(grid);
+      }
+    }
+
     function renderApp() {
       const root = $("root");
       root.innerHTML = "";
@@ -533,6 +583,7 @@
       root.appendChild(toolbar);
 
       const main = el("div","app-main");
+      main.id = "app-main";
       if (tools.length>0) {
         const bar = el("div","results-bar");
         bar.innerHTML = `Showing <strong>${list.length}</strong> of <strong>${tools.length}</strong> tools`;
@@ -580,9 +631,11 @@
       $("btn-add").onclick = () => openForm(null);
       $("btn-grid").onclick = () => { viewMode="grid"; renderApp(); };
       $("btn-list").onclick = () => { viewMode="list"; renderApp(); };
-      $("search-input").oninput = e => { search=e.target.value; renderApp(); };
-      $("cat-filter").onchange = e => { filterCat=e.target.value; renderApp(); };
-      $("stat-filter").onchange = e => { filterStatus=e.target.value; renderApp(); };
+      // Only re-render the tool grid on search — not the whole page
+      // This prevents the keyboard from dismissing on mobile
+      $("search-input").oninput = e => { search=e.target.value; renderGrid(); };
+      $("cat-filter").onchange = e => { filterCat=e.target.value; renderGrid(); };
+      $("stat-filter").onchange = e => { filterStatus=e.target.value; renderGrid(); };
     }
 
     if (isUnlocked()) { startApp(); } else { renderLock(); }
