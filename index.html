@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,7 +9,9 @@
   <meta name="apple-mobile-web-app-title" content="ToolVault" />
   <meta name="theme-color" content="#f5a623" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="apple-touch-icon" href="icon-tv-192.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
@@ -724,6 +725,17 @@
     }
 
     if (isUnlocked()) { startApp(); } else { renderLock(); }
+  </script>
+
+  <script>
+    // Register service worker for PWA support (offline + reliable icon updates)
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch(err => {
+          console.warn("Service worker registration failed:", err);
+        });
+      });
+    }
   </script>
 </body>
 </html>
